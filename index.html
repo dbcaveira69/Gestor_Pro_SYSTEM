@@ -36,6 +36,7 @@
             padding: 30px; 
             padding-bottom: 0; 
             min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container { 
@@ -51,6 +52,7 @@
             min-height: calc(100vh - 60px); 
             display: flex;
             flex-direction: column;
+            transition: background-color 0.3s, border-color 0.3s;
         }
         
         .main-header { 
@@ -125,6 +127,7 @@
         .btn-icon { width: 35px; height: 35px; padding: 0; border-radius: 4px; color: white; font-size: 14px; }
         .btn-edit { background: #cca300; color: black; }
         .btn-del { background: #96281b; color: white; }
+        .btn-theme { background: var(--primary); color: white; border-radius: 50%; width: 45px; height: 45px; font-size: 18px; margin-left: 10px; display: flex; justify-content: center; align-items: center; box-shadow: var(--tech-glow); }
         
         .btn-add-cat { 
             width: 45px; background: var(--primary); color: var(--tech-accent); 
@@ -368,6 +371,7 @@
             background: var(--bg-body); z-index: 9999; 
             display: flex; justify-content: center; align-items: center; 
             background-image: radial-gradient(#2c2f33 1px, transparent 1px); background-size: 20px 20px;
+            transition: background-color 0.3s;
         }
         body.light-mode #login-screen {
             background-image: radial-gradient(#d4d4d8 1px, transparent 1px);
@@ -469,6 +473,7 @@
                     <label for="ano-selecao" style="font-size:10px; font-weight:700; color:#888;">ANO REF:</label>
                     <input type="number" id="ano-selecao" class="year-input" onchange="mudarAno(this.value)" onkeyup="if(event.key==='Enter') mudarAno(this.value)" inputmode="numeric">
                 </div>
+                <button id="theme-toggle" class="btn-theme" onclick="toggleTheme()" title="Alterar Tema"><i class="fas fa-sun"></i></button>
             </div>
         </div>
 
@@ -591,6 +596,16 @@
                     <div class="chart-wrapper"><canvas id="chartEvo"></canvas></div>
                 </div>
                 <div id="analise-detalhada-texto">Aguardando dados...</div>
+                
+                <h3 class="section-title" style="font-size:16px; border-left-color: var(--tech-accent); margin-top:30px;">
+                    <i class="fas fa-file-invoice-dollar"></i> HISTÓRICO GERAL DE DESPESAS
+                </h3>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>DATA</th><th>DESCRIÇÃO</th><th>CATEGORIA</th><th>LOCAL</th><th>VALOR</th></tr></thead>
+                        <tbody id="tbody-geral-dossier"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="analise-categoria-container" style="display:none;">
@@ -619,7 +634,7 @@
                 </div>
 
                 <h3 class="section-title" style="font-size:16px; border-left-color: var(--tech-accent); margin-top:30px;">
-                    <i class="fas fa-file-invoice-dollar"></i> HISTÓRICO DETALHADO DE DESPESAS
+                    <i class="fas fa-file-invoice-dollar"></i> HISTÓRICO DETALHADO DA CATEGORIA
                 </h3>
                 <div class="table-container">
                     <table>
@@ -675,7 +690,6 @@
             if (nomeSalvo && statusAcesso === 'autorizado') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('user-display').innerText = `USUÁRIO(A): ${nomeSalvo.toUpperCase()}`;
-                
                 carregarNuvem(); 
             } else {
                 document.getElementById('login-screen').style.display = 'flex';
@@ -707,6 +721,23 @@
             }
         }
 
+        function toggleTheme() {
+            const body = document.body;
+            body.classList.toggle('light-mode');
+            const isLight = body.classList.contains('light-mode');
+            localStorage.setItem('app_theme', isLight ? 'light' : 'dark');
+            document.getElementById('theme-toggle').innerHTML = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        }
+
+        function aplicarTemaSalvo() {
+            const isLight = localStorage.getItem('app_theme') === 'light';
+            if(isLight) {
+                document.body.classList.add('light-mode');
+                const btn = document.getElementById('theme-toggle');
+                if(btn) btn.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        }
+
 
         // --- CONFIGURAÇÃO DA API ---
         const API_URL = "/api/database"; 
@@ -723,18 +754,6 @@
         let chartFluxoInstance = null;
         let chartCat = null, chartEvo = null;
         let chartCatEvoInstance = null, chartCatImpactInstance = null;
-
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.theme) {
-                if (event.data.theme === 'light') { document.body.classList.add('light-mode'); } 
-                else { document.body.classList.remove('light-mode'); }
-            }
-        });
-
-        function aplicarTemaSalvo() {
-            if(localStorage.getItem('app_theme') === 'light') { document.body.classList.add('light-mode'); } 
-            else { document.body.classList.remove('light-mode'); }
-        }
 
         window.onload = function() {
             aplicarTemaSalvo(); 
@@ -811,7 +830,6 @@
                 console.error("Erro ao puxar banco: ", err); 
             })
             .finally(() => {
-                // FIX: Garante que as categorias existam para montar os selects e renderizar a tela
                 if(!dados.categorias || dados.categorias.length === 0) {
                     dados.categorias = [
                         {nome: '🍔 Alimentação', cor: '#d35400'}, {nome: '🚗 Transporte', cor: '#2980b9'}, {nome: '🛒 Mercado', cor: '#e84393'},
@@ -948,6 +966,27 @@
                 
                 let maiorCat = { nome: '', valor: 0 }; for (const [cat, val] of Object.entries(cats)) { if (val > maiorCat.valor) maiorCat = { nome: cat, valor: val }; }
                 document.getElementById('analise-detalhada-texto').innerHTML = maiorCat.valor > 0 ? `<strong style="color:var(--tech-accent)">Análise:</strong> Maior área de custo no período foi: <strong>${maiorCat.nome}</strong> (${format(maiorCat.valor)}).` : "Sem dados suficientes.";
+
+                // ATUALIZAÇÃO: Tabela de Histórico Geral
+                const tbGeralDossier = document.getElementById('tbody-geral-dossier');
+                if(tbGeralDossier) {
+                    tbGeralDossier.innerHTML = '';
+                    let despesasSorted = [...despesasFiltradas].sort((a,b) => b.data.localeCompare(a.data));
+                    if(despesasSorted.length === 0) {
+                        tbGeralDossier.innerHTML = '<tr><td colspan="5" align="center" style="padding:20px;">Nenhuma despesa no período.</td></tr>';
+                    } else {
+                        despesasSorted.forEach(d => { 
+                            tbGeralDossier.innerHTML += `<tr>
+                                <td style="font-weight:bold;">${d.data.split('-').reverse().join('/')}</td>
+                                <td>${d.desc}</td>
+                                <td><span class="badge-cat" style="background:${getCorCategoria(d.cat)};">${getIconeCategoria(d.cat)} ${d.cat}</span></td>
+                                <td>${d.local || '-'}</td>
+                                <td style="text-align:right;">${format(d.valor)}</td>
+                            </tr>`; 
+                        });
+                    }
+                }
+
             } else {
                 containerGeral.style.display = 'none'; containerCat.style.display = 'block';
                 const despesasAlvo = despesasFiltradas.filter(d => d.cat === catAlvo);
